@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!78 &1
+TagManager:
+  serializedVersion: 3
+  tags:
+  - GameUI
+  layers:
+  - Default
+  - TransparentFX
+  - Ignore Raycast
+  - 
+  - Water
+  - UI
+  - Player
+  - Enemy
+  - Obstacle
+  - EnemyVision
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  m_SortingLayers:
+  - name: Default
+    uniqueID: 0
+    locked: 0
+  - name: Background
+    uniqueID: 2420112423
+    locked: 0
+  - name: Grounds
+    uniqueID: 1092274753
+    locked: 0
+  - name: Walls
+    uniqueID: 3860252593
+    locked: 0
+  - name: Props
+    uniqueID: 2814918145
+    locked: 0
+  - name: Items
+    uniqueID: 4232982893
+    locked: 0
+  - name: Enemies
+    uniqueID: 2473096533
+    locked: 0
+  - name: Player
+    uniqueID: 1107003611
+    locked: 0
+  - name: UI
+    uniqueID: 1959812195
+    locked: 0
+  m_RenderingLayers:
+  - Default
