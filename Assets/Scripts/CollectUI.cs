@@ -6,22 +6,29 @@ using UnityEngine.SceneManagement;
 
 public class CollectUI : MonoBehaviour
 {
-    // ==== Singleton & Persistence ====
     public static CollectUI Instance { get; private set; }
 
-    [Header("Persistence")]
-    public bool clearSlotsOnSceneLoad = true; // Level değişince slotları temizle
+    [Header("Ayarlar")]
+    public bool clearSlotsOnSceneLoad = true;
+
+    [Header("Center Popup (Orta Ekran)")]
+    public CanvasGroup centerGroup;
+    public Image centerImage;
+    public float centerShowTime = 0.8f;
+    public float moveTime = 0.5f; // Uçuş süresi
+
+    [Header("Inventory Icons (Sürükle-Bırak)")]
+    // BURASI ÖNEMLİ: Buraya Slot'ları değil, içindeki 'Icon' objelerini atacağız.
+    public List<Image> itemIcons = new List<Image>();
 
     void Awake()
     {
-        // Tek kopya kuralı
         if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
             return;
         }
         Instance = this;
-        //DontDestroyOnLoad(gameObject); // Sahne değişse de yok olma
     }
 
     void OnEnable() => SceneManager.sceneLoaded += OnSceneLoaded;
@@ -30,19 +37,9 @@ public class CollectUI : MonoBehaviour
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         if (clearSlotsOnSceneLoad)
-            ClearAllSlots(true);
+            ClearAllSlots();
         ResetCenterPopup();
     }
-
-    // ==== Center Popup & Move-to-Slot (önceki adımda yaptık) ====
-    [Header("Center Popup")]
-    public CanvasGroup centerGroup;
-    public Image centerImage;
-    public float centerShowTime = 0.8f;
-    public float moveTime = 0.4f;
-
-    [Header("Inventory Slots")]
-    public List<Image> slots = new List<Image>();
 
     public void OnItemCollected(Sprite sprite)
     {
@@ -52,52 +49,77 @@ public class CollectUI : MonoBehaviour
 
     private IEnumerator AnimatePickup(Sprite s)
     {
-        centerImage.sprite = s;
-        centerImage.SetNativeSize();
-        yield return Fade(centerGroup, 0f, 1f, 0.15f);
-        
-        // Küçük bir gecikme: itemi topladığın anda basılı tuşlarla kapanmasın diye
-        yield return new WaitForSeconds(0.1f);
+        // 1. Oyunu dondur
+        Time.timeScale = 0f;
 
-        // Oyuncu herhangi bir tuşa basana kadar bekle
+        // Ortadaki görseli ayarla ve göster
+        centerImage.sprite = s;
+        centerImage.SetNativeSize(); // Görselin orijinal boyutunu korur (veya silebilirsin)
+
+        // Fade In
+        yield return Fade(centerGroup, 0f, 1f, 0.15f);
+
+        // Kullanıcı hemen geçmesin diye minik bekleme
+        yield return new WaitForSecondsRealtime(0.2f);
+
+        // Tuşa basılmasını bekle
         yield return new WaitUntil(() => Input.anyKeyDown);
 
-        Image target = GetNextEmptySlot();
-        if (target == null)
+        // Boş olan ilk İKONU bul (Slotu değil, ikonu arıyoruz)
+        Image targetIcon = GetNextEmptyIcon();
+
+        // Eğer yer yoksa kapat ve devam et
+        if (targetIcon == null)
         {
             yield return Fade(centerGroup, 1f, 0f, 0.15f);
+            Time.timeScale = 1f;
             yield break;
         }
 
+        // 2. Oyunu devam ettir (Uçarken oyun aksın)
+        Time.timeScale = 1f;
+
+        // 3. Uçuş Animasyonu için kopya oluştur
         Image moving = Instantiate(centerImage, centerImage.transform.parent);
         moving.raycastTarget = false;
 
-        yield return Fade(centerGroup, 1f, 0f, 0.1f);
+        // Ortadakini gizle
+        centerGroup.alpha = 0f;
 
         RectTransform rt = moving.rectTransform;
-        Vector3 start = rt.position;
-        Vector3 end = target.rectTransform.position;
+        Vector3 startPos = rt.position;
+        Vector3 endPos = targetIcon.rectTransform.position; // İkonun olduğu yere git
 
         float t = 0f;
         while (t < moveTime)
         {
             t += Time.unscaledDeltaTime;
             float k = Mathf.Clamp01(t / moveTime);
-            rt.position = Vector3.Lerp(start, end, k);
+            // Yumuşak geçiş (Ease-in-out)
+            float smoothK = Mathf.SmoothStep(0f, 1f, k);
+
+            rt.position = Vector3.Lerp(startPos, endPos, smoothK);
+
+            // Opsiyonel: Giderken küçülsün istersen:
+            // rt.localScale = Vector3.Lerp(Vector3.one, Vector3.one * 0.5f, smoothK);
+
             yield return null;
         }
 
-        target.sprite = s;
-        target.enabled = true;
-        Destroy(moving.gameObject);
+        // 4. Hedefe vardı, İkonu aç
+        targetIcon.sprite = s;
+        targetIcon.enabled = true; // Gizli olan ikonu görünür yap
+
+        Destroy(moving.gameObject); // Uçan kopyayı yok et
     }
 
-    private Image GetNextEmptySlot()
+    // Boş (gizli) olan ilk ikonu bulur
+    private Image GetNextEmptyIcon()
     {
-        foreach (var img in slots)
+        foreach (var img in itemIcons)
         {
-            if (img == null) continue;
-            if (!img.enabled || img.sprite == null)
+            // Eğer image enable değilse (kapalıysa) boştur
+            if (img != null && !img.enabled)
                 return img;
         }
         return null;
@@ -115,22 +137,20 @@ public class CollectUI : MonoBehaviour
         g.alpha = b;
     }
 
-    // ==== Yardımcılar ====
-    public void ClearAllSlots(bool disableImages)
+    public void ClearAllSlots()
     {
-        foreach (var img in slots)
+        foreach (var img in itemIcons)
         {
-            if (img == null) continue;
-            img.sprite = null;
-            if (disableImages) img.enabled = false;
+            if (img != null)
+            {
+                img.sprite = null;
+                img.enabled = false; // İkonu gizle (Kutu arkada görünmeye devam eder)
+            }
         }
     }
 
     public void ResetCenterPopup()
     {
         if (centerGroup != null) centerGroup.alpha = 0f;
-        if (centerImage != null) centerImage.sprite = null;
     }
 }
-
-
